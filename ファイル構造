@@ -1,0 +1,5 @@
+your_project/
+├── app.py
+├── uploads/  # 写真を保存するディレクトリ
+└── templates/
+    └── index.html
