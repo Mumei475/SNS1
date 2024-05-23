@@ -1,0 +1,58 @@
+import UIKit
+import Photos
+
+class ViewController: UIViewController, UICollectionViewDataSource, UICollectionViewDelegate {
+
+    @IBOutlet weak var collectionView: UICollectionView!
+    
+    var assets = [PHAsset]()
+    let imageManager = PHImageManager.default()
+    
+    override func viewDidLoad() {
+        super.viewDidLoad()
+        // ユーザーの写真ライブラリから画像を取得する
+        fetchPhotos()
+    }
+    
+    func fetchPhotos() {
+        // ユーザーの写真ライブラリからアセットを取得する
+        let fetchOptions = PHFetchOptions()
+        fetchOptions.sortDescriptors = [NSSortDescriptor(key: "creationDate", ascending: false)]
+        let fetchResult = PHAsset.fetchAssets(with: .image, options: fetchOptions)
+        
+        // アセットを配列に追加する
+        fetchResult.enumerateObjects { (asset, _, _) in
+            self.assets.append(asset)
+        }
+        
+        // コレクションビューをリロードして画像を表示する
+        DispatchQueue.main.async {
+            self.collectionView.reloadData()
+        }
+    }
+    
+    func collectionView(_ collectionView: UICollectionView, numberOfItemsInSection section: Int) -> Int {
+        return assets.count
+    }
+    
+    func collectionView(_ collectionView: UICollectionView, cellForItemAt indexPath: IndexPath) -> UICollectionViewCell {
+        let cell = collectionView.dequeueReusableCell(withReuseIdentifier: "PhotoCell", for: indexPath) as! PhotoCell
+        let asset = assets[indexPath.item]
+        
+        // アセットから画像を取得してセルに表示する
+        let options = PHImageRequestOptions()
+        options.isSynchronous = false
+        options.deliveryMode = .highQualityFormat
+        options.resizeMode = .exact
+        
+        imageManager.requestImage(for: asset, targetSize: CGSize(width: 100, height: 100), contentMode: .aspectFill, options: options) { (image, _) in
+            cell.imageView.image = image
+        }
+        
+        return cell
+    }
+}
+
+class PhotoCell: UICollectionViewCell {
+    @IBOutlet weak var imageView: UIImageView!
+}
