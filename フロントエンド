@@ -84,5 +84,13 @@
             <li>{{ notification }}</li>
         {% endfor %}
     </ul>
+
+    <!-- Invite Registration Form -->
+    <h2>Register with Invitation</h2>
+    <form action="/register_invited/{{ invitation_id }}" method="POST">
+        <input type="text" name="username" placeholder="Username" required>
+        <input type="email" name="email" placeholder="Email" required>
+        <button type="submit">Register</button>
+    </form>
 </body>
 </html>
