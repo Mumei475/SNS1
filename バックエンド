@@ -1,35 +1,27 @@
-import os
+from flask import Flask, request, redirect, url_for, render_template, flash, get_flashed_messages
 import uuid
-from flask import Flask, request, redirect, url_for, render_template, flash
-from flask_uploads import UploadSet, configure_uploads, IMAGES
-from werkzeug.utils import secure_filename
 
 app = Flask(__name__)
-app.secret_key = 'supersecretkey'
-
-# Configure the image upload set
-photos = UploadSet('photos', IMAGES)
-app.config['UPLOADED_PHOTOS_DEST'] = 'uploads'
-configure_uploads(app, photos)
-
-# In-memory storage for users, posts, invitations, and notifications
-users = {}
-posts = []
-invitations = {}
-notifications = []
+app.secret_key = 'your_secret_key'
 
 class SocialPlatform:
+    def __init__(self):
+        self.users = {}
+        self.posts = []
+        self.invitations = {}
+        self.notifications = []
+
     def invite_user(self, username, link):
         invitation_id = str(uuid.uuid4())
-        if username in invitations:
-            invitations[username].append((invitation_id, link))
+        if username in self.invitations:
+            self.invitations[username].append((invitation_id, link))
         else:
-            invitations[username] = [(invitation_id, link)]
+            self.invitations[username] = [(invitation_id, link)]
         return invitation_id
 
     def create_post(self, username, content, photo=None, link=None, video=None):
         post = {
-            "id": len(posts),
+            "id": len(self.posts),
             "username": username,
             "content": content,
             "photo": photo,
@@ -38,20 +30,83 @@ class SocialPlatform:
             "comments": [],
             "likes": 0
         }
-        posts.append(post)
+        self.posts.append(post)
 
     def view_posts(self):
-        return posts
+        return self.posts
 
     def add_comment(self, post_id, comment):
-        if post_id < len(posts):
-            posts[post_id]["comments"].append(comment)
-
-    def add_like(self, post_id):
-        if post_id < len(posts):
-            posts[post_id]["likes"] += 1
+        self.posts[post_id]["comments"].append(comment)
 
     def send_notification(self, message):
-        notifications.append(message)
+        self.notifications.append(message)
 
-    def send_inquiry(
+    def send_inquiry(self, username, message):
+        inquiry = {"username": username, "message": message}
+        self.notifications.append(inquiry)
+
+# インスタンスの作成
+platform = SocialPlatform()
+
+@app.route('/')
+def index():
+    return render_template('index.html', posts=platform.view_posts(), notifications=platform.notifications)
+
+@app.route('/register', methods=['POST'])
+def register():
+    username = request.form['username']
+    email = request.form['email']
+    if username in platform.users:
+        flash('Username is already taken.')
+    else:
+        platform.users[username] = email
+        flash('User registered successfully.')
+    return redirect(url_for('index'))
+
+@app.route('/invite', methods=['POST'])
+def invite():
+    username = request.form['username']
+    link = request.form['link']
+    invitation_id = platform.invite_user(username, link)
+    flash(f'Invitation sent with ID: {invitation_id}')
+    return redirect(url_for('index'))
+
+@app.route('/register_invited/<invitation_id>', methods=['GET', 'POST'])
+def register_invited(invitation_id):
+    if request.method == 'POST':
+        username = request.form['username']
+        email = request.form['email']
+        # Validate invitation
+        for invites in platform.invitations.values():
+            if any(inv[0] == invitation_id for inv in invites):
+                platform.users[username] = email
+                flash('User registered successfully through invitation.')
+                return redirect(url_for('index'))
+        flash('Invalid invitation link.')
+        return redirect(url_for('index'))
+    return render_template('register_invited.html', invitation_id=invitation_id)
+
+@app.route('/post', methods=['POST'])
+def post():
+    username = request.form['username']
+    content = request.form['content']
+    photo = request.files['photo'].filename if 'photo' in request.files else None
+    link = request.form['link']
+    video = request.form['video']
+    platform.create_post(username, content, photo, link, video)
+    flash('Post created successfully.')
+    return redirect(url_for('index'))
+
+@app.route('/like/<int:post_id>', methods=['POST'])
+def like(post_id):
+    platform.posts[post_id]['likes'] += 1
+    return redirect(url_for('index'))
+
+@app.route('/comment/<int:post_id>', methods=['POST'])
+def comment(post_id):
+    comment = request.form['comment']
+    platform.add_comment(post_id, comment)
+    return redirect(url_for('index'))
+
+if __name__ == '__main__':
+    app.run(debug=True)
