@@ -1,0 +1,65 @@
+import uuid
+
+class SocialPlatform:
+    def __init__(self):
+        self.users = {}
+        self.posts = []
+        self.invitations = {}
+        self.notifications = []
+
+    def invite_user(self, username, link):
+        invitation_id = str(uuid.uuid4())
+        if username in self.invitations:
+            self.invitations[username].append((invitation_id, link))
+        else:
+            self.invitations[username] = [(invitation_id, link)]
+        return invitation_id
+
+    def create_post(self, username, content, photo=None, link=None, video=None):
+        post = {
+            "username": username,
+            "content": content,
+            "photo": photo,
+            "link": link,
+            "video": video,
+            "comments": []
+        }
+        self.posts.append(post)
+
+    def view_posts(self):
+        return self.posts
+
+    def add_comment(self, post_id, comment):
+        self.posts[post_id]["comments"].append(comment)
+
+    def send_notification(self, message):
+        self.notifications.append(message)
+
+    def send_inquiry(self, username, message):
+        inquiry = {"username": username, "message": message}
+        self.notifications.append(inquiry)
+
+# Usage example
+platform = SocialPlatform()
+
+# Invite users
+invitation_id1 = platform.invite_user("Alice", "https://example.com/invite1")
+invitation_id2 = platform.invite_user("Bob", "https://example.com/invite2")
+
+# Create posts
+platform.create_post("Alice", "Hello World!", photo="photo1.jpg", link="https://example.com", video="video1.mp4")
+platform.create_post("Bob", "Check out this link!", link="https://example.com")
+
+# View posts
+print(platform.view_posts())
+
+# Add comments
+platform.add_comment(0, "Nice post!")
+platform.add_comment(1, "Interesting!")
+
+# Send notifications
+platform.send_notification("New post available!")
+platform.send_inquiry("Charlie", "How does this work?")
+
+# View notifications
+print(platform.notifications)
