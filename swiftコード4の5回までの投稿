@@ -1,0 +1,55 @@
+class SocialPlatform: ObservableObject {
+    // 既存のプロパティとメソッド...
+
+    private var dailyPostCount: [UUID: Int] = [:]
+    private var dailyLikeCount: [UUID: Int] = [:]
+    private var dailyCommentCount: [UUID: Int] = [:]
+    private var resetTime: Date = Calendar.current.startOfDay(for: Date())
+
+    func resetDailyCountsIfNeeded() {
+        let now = Date()
+        if now >= resetTime.addingTimeInterval(86400) { // 1日後
+            dailyPostCount.removeAll()
+            dailyLikeCount.removeAll()
+            dailyCommentCount.removeAll()
+            resetTime = Calendar.current.startOfDay(for: now)
+        }
+    }
+    
+    // 既存のメソッド内にresetDailyCountsIfNeeded()を追加...
+
+    func createPost(userId: UUID, content: String, photo: String? = nil, link: String? = nil, video: String? = nil) {
+        resetDailyCountsIfNeeded()
+        guard content.count <= 100 else { return }
+        let count = dailyPostCount[userId] ?? 0
+        guard count < 5 else { return }
+        
+        let post = Post(userId: userId, content: content, photo: photo, link: link, video: video, timestamp: Date())
+        posts.append(post)
+        dailyPostCount[userId] = count + 1
+    }
+
+    func addComment(to postID: UUID, userId: UUID, comment: String) {
+        resetDailyCountsIfNeeded()
+        guard comment.count <= 100 else { return }
+        let count = dailyCommentCount[userId] ?? 0
+        guard count < 5 else { return }
+        
+        if let index = posts.firstIndex(where: { $0.id == postID }) {
+            let newComment = Comment(userId: userId, content: comment, timestamp: Date())
+            posts[index].comments.append(newComment)
+            dailyCommentCount[userId] = count + 1
+        }
+    }
+
+    func likePost(postID: UUID, userId: UUID) {
+        resetDailyCountsIfNeeded()
+        let count = dailyLikeCount[userId] ?? 0
+        guard count < 5 else { return }
+        
+        if let index = posts.firstIndex(where: { $0.id == postID }) {
+            posts[index].likes += 1
+            dailyLikeCount[userId] = count + 1
+        }
+    }
+}
