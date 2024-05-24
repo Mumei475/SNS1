@@ -1,0 +1,261 @@
+import SwiftUI
+import Combine
+import PhotosUI
+
+// ユーザーデータのモデル
+struct User: Identifiable {
+    let id = UUID()
+    var username: String
+    let email: String
+}
+
+// 投稿データのモデル
+struct Post: Identifiable {
+    let id = UUID()
+    let userId: UUID
+    let content: String
+    var photo: String?
+    var link: String?
+    var video: String?
+    var comments: [Comment] = []
+    var likes: Int = 0
+    var timestamp: Date
+}
+
+struct Comment: Identifiable {
+    let id = UUID()
+    let userId: UUID
+    let content: String
+    let timestamp: Date
+}
+
+// ソーシャルプラットフォームのクラス
+class SocialPlatform: ObservableObject {
+    @Published var users: [User] = []
+    @Published var posts: [Post] = []
+    @Published var notifications: [String] = []
+    @Published var contacts: [String] = []
+    
+    private var dailyPostCount: [UUID: Int] = [:]
+    private var dailyLikeCount: [UUID: Int] = [:]
+    private var dailyCommentCount: [UUID: Int] = [:]
+    
+    func inviteUser(currentUserID: UUID, username: String, link: String) -> UUID {
+        let invitationID = UUID()
+        notifications.append("User \(username) invited with link \(link)")
+        return invitationID
+    }
+    
+    func createPost(userId: UUID, content: String, photo: String? = nil, link: String? = nil, video: String? = nil) {
+        guard content.count <= 100 else { return }
+        let count = dailyPostCount[userId] ?? 0
+        guard count < 5 else { return }
+        
+        let post = Post(userId: userId, content: content, photo: photo, link: link, video: video, timestamp: Date())
+        posts.append(post)
+        dailyPostCount[userId] = count + 1
+    }
+    
+    func addComment(to postID: UUID, userId: UUID, comment: String) {
+        guard comment.count <= 100 else { return }
+        let count = dailyCommentCount[userId] ?? 0
+        guard count < 5 else { return }
+        
+        if let index = posts.firstIndex(where: { $0.id == postID }) {
+            let newComment = Comment(userId: userId, content: comment, timestamp: Date())
+            posts[index].comments.append(newComment)
+            dailyCommentCount[userId] = count + 1
+        }
+    }
+    
+    func likePost(postID: UUID, userId: UUID) {
+        let count = dailyLikeCount[userId] ?? 0
+        guard count < 5 else { return }
+        
+        if let index = posts.firstIndex(where: { $0.id == postID }) {
+            posts[index].likes += 1
+            dailyLikeCount[userId] = count + 1
+        }
+    }
+    
+    func registerUser(username: String, email: String) -> UUID {
+        let user = User(username: username, email: email)
+        users.append(user)
+        return user.id
+    }
+    
+    func sendMessageToUser(userId: UUID, message: String) {
+        if let user = users.first(where: { $0.id == userId }) {
+            contacts.append("Message to \(user.username): \(message)")
+        }
+    }
+    
+    func clearOldPosts() {
+        let oneDayAgo = Date().addingTimeInterval(-86400) // 24 hours ago
+        posts.removeAll { $0.timestamp < oneDayAgo }
+    }
+}
+
+struct ContentView: View {
+    @StateObject private var platform = SocialPlatform()
+    @State private var newUsername = ""
+    @State private var newEmail = ""
+    @State private var newPostContent = ""
+    @State private var newPostPhoto: UIImage? = nil
+    @State private var newPostLink = ""
+    @State private var newPostVideo = ""
+    @State private var currentUserID: UUID?
+    @State private var commentContent = ""
+    @State private var selectedImage: UIImage? = nil
+    @State private var showingImagePicker = false
+    
+    var body: some View {
+        NavigationView {
+            VStack {
+                if currentUserID == nil {
+                    Form {
+                        Section(header: Text("Register User")) {
+                            TextField("Username", text: $newUsername)
+                            TextField("Email", text: $newEmail)
+                            Button("Register") {
+                                currentUserID = platform.registerUser(username: newUsername, email: newEmail)
+                                newUsername = ""
+                                newEmail = ""
+                            }
+                        }
+                    }
+                } else {
+                    VStack {
+                        Form {
+                            Section(header: Text("Create Post")) {
+                                TextField("Content", text: $newPostContent)
+                                if let newPostPhoto = newPostPhoto {
+                                    Image(uiImage: newPostPhoto)
+                                        .resizable()
+                                        .scaledToFit()
+                                        .frame(maxWidth: 200)
+                                }
+                                Button("Select Photo") {
+                                    showingImagePicker = true
+                                }
+                                TextField("Link", text: $newPostLink)
+                                TextField("Video URL", text: $newPostVideo)
+                                Button("Post") {
+                                    guard let userId = currentUserID else { return }
+                                    platform.createPost(userId: userId, content: newPostContent, photo: newPostPhoto?.pngData()?.base64EncodedString(), link: newPostLink, video: newPostVideo)
+                                    newPostContent = ""
+                                    newPostPhoto = nil
+                                    newPostLink = ""
+                                    newPostVideo = ""
+                                }
+                            }
+                        }
+                        
+                        List(platform.posts) { post in
+                            VStack(alignment: .leading) {
+                                if let user = platform.users.first(where: { $0.id == post.userId }) {
+                                    Text(user.username).font(.headline)
+                                }
+                                Text(post.content).padding(.bottom, 5)
+                                if let photo = post.photo, let imageData = Data(base64Encoded: photo), let uiImage = UIImage(data: imageData) {
+                                    Image(uiImage: uiImage)
+                                        .resizable()
+                                        .scaledToFit()
+                                        .frame(maxWidth: 200)
+                                }
+                                if let link = post.link {
+                                    Link(link, destination: URL(string: link)!)
+                                }
+                                if let video = post.video {
+                                    Link(video, destination: URL(string: video)!)
+                                }
+                                Text("Likes: \(post.likes)")
+                                Button("Like") {
+                                    guard let userId = currentUserID else { return }
+                                    platform.likePost(postID: post.id, userId: userId)
+                                }
+                                ForEach(post.comments) { comment in
+                                    if let user = platform.users.first(where: { $0.id == comment.userId }) {
+                                        Text("\(user.username): \(comment.content)").padding(.leading, 10)
+                                    }
+                                }
+                                TextField("Add a comment", text: $commentContent)
+                                Button("Comment") {
+                                    guard let userId = currentUserID else { return }
+                                    platform.addComment(to: post.id, userId: userId, comment: commentContent)
+                                    commentContent = ""
+                                }
+                            }
+                        }
+                        
+                        List(platform.notifications, id: \.self) { notification in
+                            Text(notification)
+                        }
+                        
+                        List(platform.contacts, id: \.self) { contact in
+                            Text(contact)
+                        }
+                    }
+                }
+            }
+            .navigationTitle("Simple SNS")
+            .onAppear {
+                platform.clearOldPosts()
+            }
+            .sheet(isPresented: $showingImagePicker) {
+                ImagePicker(image: $selectedImage)
+                    .onDisappear {
+                        if let selectedImage = selectedImage {
+                            newPostPhoto = selectedImage
+                        }
+                    }
+            }
+        }
+    }
+}
+
+@main
+struct SimpleSNSApp: App {
+    var body: some Scene {
+        WindowGroup {
+            ContentView()
+        }
+    }
+}
+
+struct ImagePicker: UIViewControllerRepresentable {
+    class Coordinator: NSObject, PHPickerViewControllerDelegate {
+        var parent: ImagePicker
+
+        init(parent: ImagePicker) {
+            self.parent = parent
+        }
+
+        func picker(_ picker: PHPickerViewController, didFinishPicking results: [PHPickerResult]) {
+            picker.dismiss(animated: true)
+
+            guard let provider = results.first?.itemProvider else { return }
+            if provider.canLoadObject(ofClass: UIImage.self) {
+                provider.loadObject(ofClass: UIImage.self) { image, _ in
+                    self.parent.image = image as? UIImage
+                }
+            }
+        }
+    }
+
+    @Binding var image: UIImage?
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator(parent: self)
+    }
+
+    func makeUIViewController(context: Context) -> PHPickerViewController {
+        var configuration = PHPickerConfiguration()
+        configuration.filter = .images
+        let picker = PHPickerViewController(configuration: configuration)
+        picker.delegate = context.coordinator
+        return picker
+    }
+
+    func updateUIViewController(_ uiViewController: PHPickerViewController, context: Context) {}
+}
