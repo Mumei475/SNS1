@@ -1,0 +1,116 @@
+import Foundation
+
+// User Model
+class User {
+    var username: String
+    
+    init(username: String) {
+        self.username = username
+    }
+}
+
+// Post Model
+class Post {
+    var content: String
+    var author: User
+    var timestamp: Date
+    var likes: Int
+    var comments: [Comment]
+    
+    init(content: String, author: User) {
+        self.content = content
+        self.author = author
+        self.timestamp = Date()
+        self.likes = 0
+        self.comments = []
+    }
+    
+    func addLike() {
+        self.likes += 1
+    }
+    
+    func addComment(comment: Comment) {
+        self.comments.append(comment)
+    }
+    
+    func isExpired() -> Bool {
+        return Date().timeIntervalSince(self.timestamp) > 24 * 60 * 60
+    }
+}
+
+// Comment Model
+class Comment {
+    var content: String
+    var author: User
+    var timestamp: Date
+    
+    init(content: String, author: User) {
+        self.content = content
+        self.author = author
+        self.timestamp = Date()
+    }
+}
+
+// Social Media Platform
+class SocialMediaPlatform {
+    var users: [User] = []
+    var posts: [Post] = []
+    
+    func registerUser(username: String) -> User {
+        let user = User(username: username)
+        users.append(user)
+        return user
+    }
+    
+    func createPost(content: String, author: User) -> Post? {
+        if content.count > 100 || countUserPostsToday(author: author) >= 5 {
+            return nil
+        }
+        let post = Post(content: content, author: author)
+        posts.append(post)
+        return post
+    }
+    
+    func likePost(post: Post, user: User) {
+        if countUserLikesToday(user: user) < 5 {
+            post.addLike()
+        }
+    }
+    
+    func commentOnPost(post: Post, content: String, author: User) {
+        if content.count <= 100 && countUserCommentsToday(author: author) < 5 {
+            let comment = Comment(content: content, author: author)
+            post.addComment(comment: comment)
+        }
+    }
+    
+    func getPosts() -> [Post] {
+        return posts.filter { !$0.isExpired() }
+    }
+    
+    private func countUserPostsToday(author: User) -> Int {
+        return posts.filter { $0.author.username == author.username && Calendar.current.isDateInToday($0.timestamp) }.count
+    }
+    
+    private func countUserLikesToday(user: User) -> Int {
+        return posts.reduce(0) { $0 + $1.likes }
+    }
+    
+    private func countUserCommentsToday(author: User) -> Int {
+        return posts.flatMap { $0.comments }.filter { $0.author.username == author.username && Calendar.current.isDateInToday($0.timestamp) }.count
+    }
+}
+
+// Usage Example
+let platform = SocialMediaPlatform()
+let user1 = platform.registerUser(username: "user1")
+let user2 = platform.registerUser(username: "user2")
+
+if let post = platform.createPost(content: "Hello World!", author: user1) {
+    platform.likePost(post: post, user: user2)
+    platform.commentOnPost(post: post, content: "Nice post!", author: user2)
+}
+
+for post in platform.getPosts() {
+    print("Post: \(post.content), Likes: \(post.likes), Comments: \(post.comments.count)")
+}
