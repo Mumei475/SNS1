@@ -1,0 +1,76 @@
+import Cocoa
+import AVKit
+
+class VRVideoPlayerViewController: NSViewController {
+    
+    @IBOutlet weak var videoPlayerView: NSView!
+    var player: AVPlayer?
+    
+    override func viewDidLoad() {
+        super.viewDidLoad()
+        // Load VR video player view
+        loadVRVideoPlayer()
+    }
+    
+    func loadVRVideoPlayer() {
+        // Load VR video player using AVPlayerLayer
+        guard let videoURL = URL(string: "your_vr_video_url_here") else { return }
+        let player = AVPlayer(url: videoURL)
+        let playerLayer = AVPlayerLayer(player: player)
+        playerLayer.frame = videoPlayerView.bounds
+        videoPlayerView.layer?.addSublayer(playerLayer)
+        self.player = player
+    }
+    
+    @IBAction func chooseVideoButtonTapped(_ sender: NSButton) {
+        // Implement video selection functionality (e.g., from file system)
+        let openPanel = NSOpenPanel()
+        openPanel.allowedFileTypes = ["public.movie"]
+        openPanel.canChooseFiles = true
+        openPanel.canChooseDirectories = false
+        openPanel.begin { response in
+            if response == .OK, let videoURL = openPanel.url {
+                self.selectedVideoURL = videoURL
+                // Play the selected video
+                self.player?.pause()
+                self.player = AVPlayer(url: videoURL)
+                let playerLayer = AVPlayerLayer(player: self.player)
+                playerLayer.frame = self.videoPlayerView.bounds
+                self.videoPlayerView.layer?.addSublayer(playerLayer)
+                self.player?.play()
+            }
+        }
+    }
+    
+    @IBAction func postVideoButtonTapped(_ sender: NSButton) {
+        // Check if a video is selected
+        guard let selectedVideoURL = selectedVideoURL else {
+            // Display an alert or message to inform the user to select a video first
+            return
+        }
+        
+        // Upload the selected video to the server
+        uploadVideoToServer(videoURL: selectedVideoURL)
+    }
+    
+    @IBAction func movePlayer(_ sender: NSPanGestureRecognizer) {
+        // Move player's viewpoint within the VR video
+        guard let player = player else { return }
+        
+        let translation = sender.translation(in: videoPlayerView)
+        sender.setTranslation(.zero, in: videoPlayerView)
+        
+        let duration = player.currentItem?.duration ?? CMTime.zero
+        let scale: CGFloat = 100.0 // Adjust this value to control the sensitivity of the pan gesture
+        
+        let deltaX = translation.x / videoPlayerView.bounds.width * scale
+        let deltaY = translation.y / videoPlayerView.bounds.height * scale
+        
+        let currentTime = CMTimeGetSeconds(player.currentTime())
+        let newTime = CMTime(seconds: currentTime + Double(deltaX), preferredTimescale: duration.timescale)
+        
+        player.seek(to: newTime, toleranceBefore: .zero, toleranceAfter: .zero)
+    }
+    
+    var selectedVideoURL: URL?
+}
