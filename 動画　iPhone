@@ -1,0 +1,83 @@
+import UIKit
+import AVKit
+
+class VRVideoPlayerViewController: UIViewController {
+    
+    @IBOutlet weak var videoPlayerView: UIView!
+    var player: AVPlayer?
+    
+    override func viewDidLoad() {
+        super.viewDidLoad()
+        // Load VR video player view
+        loadVRVideoPlayer()
+    }
+    
+    func loadVRVideoPlayer() {
+        // Load VR video player using AVPlayerViewController
+        guard let videoURL = URL(string: "your_vr_video_url_here") else { return }
+        let player = AVPlayer(url: videoURL)
+        let playerLayer = AVPlayerLayer(player: player)
+        playerLayer.frame = videoPlayerView.bounds
+        videoPlayerView.layer.addSublayer(playerLayer)
+        self.player = player
+    }
+    
+    @IBAction func chooseVideoButtonTapped(_ sender: UIButton) {
+        // Implement video selection functionality (e.g., from device's media library)
+        let mediaPickerController = UIDocumentPickerViewController(documentTypes: ["public.movie"], in: .open)
+        mediaPickerController.delegate = self
+        present(mediaPickerController, animated: true, completion: nil)
+    }
+    
+    @IBAction func postVideoButtonTapped(_ sender: UIButton) {
+        // Check if a video is selected
+        guard let selectedVideoURL = selectedVideoURL else {
+            // Display an alert or message to inform the user to select a video first
+            return
+        }
+        
+        // Upload the selected video to the server
+        uploadVideoToServer(videoURL: selectedVideoURL)
+    }
+    
+    @IBAction func movePlayer(_ sender: UIPanGestureRecognizer) {
+        // Move player's viewpoint within the VR video
+        // This function could translate the player's viewpoint based on pan gesture
+        guard let player = player else { return }
+        
+        let translation = sender.translation(in: videoPlayerView)
+        sender.setTranslation(.zero, in: videoPlayerView)
+        
+        let forwardTransform = player.currentItem?.forwardPlaybackEndTime ?? CMTime.zero
+        let backwardTransform = player.currentItem?.backwardPlaybackEndTime ?? CMTime.zero
+        
+        // Adjust player's viewpoint based on translation
+        let moveRatio: CGFloat = 0.01
+        let translationX = Float(translation.x) * moveRatio
+        let translationY = Float(translation.y) * moveRatio
+        
+        let time = player.currentTime()
+        let newTime = CMTimeMake(value: time.value + Int64(translationX), timescale: time.timescale)
+        player.seek(to: newTime, toleranceBefore: backwardTransform, toleranceAfter: forwardTransform)
+    }
+    
+    var selectedVideoURL: URL?
+}
+
+extension VRVideoPlayerViewController: UIDocumentPickerDelegate {
+    func documentPicker(_ controller: UIDocumentPickerViewController, didPickDocumentsAt urls: [URL]) {
+        guard let videoURL = urls.first else {
+            // Handle error
+            return
+        }
+        selectedVideoURL = videoURL
+        
+        // Play the selected video
+        player?.pause()
+        player = AVPlayer(url: videoURL)
+        let playerLayer = AVPlayerLayer(player: player)
+        playerLayer.frame = videoPlayerView.bounds
+        videoPlayerView.layer.addSublayer(playerLayer)
+        player?.play()
+    }
+}
