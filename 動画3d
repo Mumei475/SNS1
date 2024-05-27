@@ -1,0 +1,123 @@
+import Cocoa
+import SceneKit
+import AVKit
+
+class VRVideoPlayerViewController: NSViewController {
+    
+    @IBOutlet weak var sceneView: SCNView!
+    var player: AVPlayer?
+    
+    override func viewDidLoad() {
+        super.viewDidLoad()
+        // Load VR video player view
+        loadVRVideoPlayer()
+        
+        // Setup SceneKit scene
+        setupScene()
+    }
+    
+    func loadVRVideoPlayer() {
+        // Load VR video player using AVPlayer
+        guard let videoURL = URL(string: "your_vr_video_url_here") else { return }
+        let player = AVPlayer(url: videoURL)
+        let playerItem = AVPlayerItem(url: videoURL)
+        player.replaceCurrentItem(with: playerItem)
+        player.play()
+        self.player = player
+    }
+    
+    func setupScene() {
+        // Create SceneKit scene
+        let scene = SCNScene()
+        
+        // Create 360-degree video node
+        let videoNode = SKVideoNode(avPlayer: player)
+        videoNode.position = SCNVector3(0, 0, -10) // Adjust position as needed
+        videoNode.size = CGSize(width: 100, height: 56.25) // Assume video aspect ratio is 16:9
+        videoNode.play()
+        
+        // Create sphere geometry to display video
+        let sphere = SCNSphere(radius: 10)
+        sphere.firstMaterial?.diffuse.contents = videoNode
+        sphere.firstMaterial?.isDoubleSided = true
+        
+        // Create sphere node
+        let sphereNode = SCNNode(geometry: sphere)
+        sphereNode.eulerAngles = SCNVector3(0, .pi, 0) // Adjust orientation to face inward
+        
+        // Add sphere node to scene
+        scene.rootNode.addChildNode(sphereNode)
+        
+        // Set the scene to the view
+        sceneView.scene = scene
+        
+        // Configure the view
+        sceneView.backgroundColor = NSColor.black
+        sceneView.allowsCameraControl = true
+    }
+    
+    @IBAction func chooseVideoButtonTapped(_ sender: NSButton) {
+        // Implement video selection functionality (e.g., from file system)
+        let openPanel = NSOpenPanel()
+        openPanel.allowedFileTypes = ["public.movie"]
+        openPanel.canChooseFiles = true
+        openPanel.canChooseDirectories = false
+        openPanel.begin { response in
+            if response == .OK, let videoURL = openPanel.url {
+                self.selectedVideoURL = videoURL
+                // Play the selected video
+                self.player?.pause()
+                self.player = AVPlayer(url: videoURL)
+                let playerLayer = AVPlayerLayer(player: self.player)
+                playerLayer.frame = self.sceneView.bounds
+                self.sceneView.layer?.addSublayer(playerLayer)
+                self.player?.play()
+            }
+        }
+    }
+    
+    @IBAction func postVideoButtonTapped(_ sender: NSButton) {
+        // Check if a video is selected
+        guard let selectedVideoURL = selectedVideoURL else {
+            // Display an alert or message to inform the user to select a video first
+            return
+        }
+        
+        // Upload the selected video to the server
+        uploadVideoToServer(videoURL: selectedVideoURL)
+    }
+    
+    @IBAction func movePlayer(_ sender: NSPanGestureRecognizer) {
+        // Move player's viewpoint within the VR video
+        guard let player = player else { return }
+        
+        let translation = sender.translation(in: sceneView)
+        sender.setTranslation(.zero, in: sceneView)
+        
+        let duration = player.currentItem?.duration ?? CMTime.zero
+        let scale: CGFloat = 100.0 // Adjust this value to control the sensitivity of the pan gesture
+        
+        let deltaX = translation.x / sceneView.bounds.width * scale
+        let deltaY = translation.y / sceneView.bounds.height * scale
+        
+        let currentTime = CMTimeGetSeconds(player.currentTime())
+        let newTime = CMTime(seconds: currentTime + Double(deltaX), preferredTimescale: duration.timescale)
+        
+        player.seek(to: newTime, toleranceBefore: .zero, toleranceAfter: .zero)
+    }
+    
+    func uploadVideoToServer(videoURL: URL) {
+        // Implement video upload to server functionality
+        // This could involve sending the video file to a server using networking APIs
+        // Here's a placeholder implementation for demonstration purposes:
+        
+        // Simulating upload progress
+        print("Uploading video to server...")
+        DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) {
+            print("Video uploaded successfully!")
+            // Display a success message or handle further actions
+        }
+    }
+    
+    var selectedVideoURL: URL?
+}
