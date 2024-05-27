@@ -1,0 +1,78 @@
+using UnityEngine;
+using UnityEngine.UI;
+using UnityEngine.Video;
+
+public class VRVideoPlayerController : MonoBehaviour
+{
+    public Transform playerCamera; // Reference to the VR camera
+    public VideoPlayer videoPlayer; // Reference to the VideoPlayer component
+    public GameObject videoScreen; // GameObject representing the screen to display videos
+    public Button postButton; // Button for posting videos
+    public Button chooseVideoButton; // Button for choosing videos
+    public Button watchButton; // Button for watching selected videos
+
+    private string selectedVideoPath; // Path of the selected video
+    private bool isVRMode = false; // Flag to indicate if in VR mode
+
+    void Start()
+    {
+        // Add click event listeners to buttons
+        postButton.onClick.AddListener(PostVideo);
+        chooseVideoButton.onClick.AddListener(ChooseVideo);
+        watchButton.onClick.AddListener(WatchVideo);
+
+        // Check if in VR mode
+        isVRMode = UnityEngine.XR.XRSettings.enabled;
+    }
+
+    void Update()
+    {
+        // Move the player according to input
+        float moveSpeed = 0.1f;
+        Vector3 moveDirection = Vector3.zero;
+
+        if (isVRMode)
+        {
+            // VR mode: move according to VR controller input
+            moveDirection = new Vector3(Input.GetAxis("VR Horizontal"), 0, Input.GetAxis("VR Vertical"));
+        }
+        else
+        {
+            // PC mode: move according to keyboard input
+            moveDirection = new Vector3(Input.GetAxis("Horizontal"), 0, Input.GetAxis("Vertical"));
+        }
+
+        // Translate the player's position
+        playerCamera.Translate(moveDirection * moveSpeed);
+
+        // Allow the player to look around within the video using the mouse or VR headset
+        float mouseX = Input.GetAxis("Mouse X");
+        float mouseY = Input.GetAxis("Mouse Y");
+        playerCamera.Rotate(Vector3.up * mouseX);
+        playerCamera.Rotate(Vector3.left * mouseY);
+    }
+
+    void PostVideo()
+    {
+        // Implement video posting functionality
+        // For example, you could capture a video recording from the VR environment
+        // and save it to a specified location, or upload it to a server
+    }
+
+    void ChooseVideo()
+    {
+        // Implement video choosing functionality
+        // For simplicity, let's assume we have a predefined list of video paths
+        selectedVideoPath = "path/to/selected/video.mp4";
+    }
+
+    void WatchVideo()
+    {
+        // Load and play the selected video
+        videoPlayer.url = selectedVideoPath;
+        videoPlayer.Play();
+
+        // Show the video screen
+        videoScreen.SetActive(true);
+    }
+}
