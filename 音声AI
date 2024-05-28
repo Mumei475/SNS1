@@ -1,0 +1,57 @@
+import openai
+import speech_recognition as sr
+from gtts import gTTS
+import platform
+import subprocess
+
+# OpenAI APIの設定
+openai.api_key = 'your_openai_api_key'
+model_name = 'text-davinci-003'  # 使用するChatGPTモデル
+
+# 音声認識器の初期化
+recognizer = sr.Recognizer()
+
+# ChatGPTによる応答生成関数
+def generate_response(input_text):
+    response = openai.Completion.create(
+        engine=model_name,
+        prompt=input_text,
+        max_tokens=50
+    )
+    return response.choices[0].text.strip()
+
+# 音声合成して応答を返す関数
+def speak(text):
+    tts = gTTS(text=text, lang='en')  # ChatGPTモデルが英語のため
+    tts.save("output.mp3")
+    if platform.system() == 'Darwin':  # macOSの場合
+        subprocess.call(["afplay", "output.mp3"])
+    elif platform.system() == 'Windows':  # Windowsの場合
+        os.system("start output.mp3")
+    elif platform.system() == 'Linux':  # Linuxの場合
+        subprocess.call(["xdg-open", "output.mp3"])
+
+# 音声入力を受け取り、ChatGPTに送信して応答を生成し、音声として返す関数
+def chat():
+    print("AI: こんにちは！話しかけてください。")
+    while True:
+        with sr.Microphone() as source:
+            print("あなた：（話しかけてください）")
+            recognizer.adjust_for_ambient_noise(source)
+            audio = recognizer.listen(source)
+
+        try:
+            print("音声を認識中...")
+            user_input = recognizer.recognize_google(audio)
+            print("あなた:", user_input)
+            response = generate_response(user_input)
+            print("AI:", response)
+            speak(response)
+        except sr.UnknownValueError:
+            print("音声が認識できませんでした。もう一度お試しください。")
+        except sr.RequestError as e:
+            print("Google Speech Recognition APIへのリクエストでエラーが発生しました。エラー: {0}".format(e))
+
+# メイン関数
+if __name__ == "__main__":
+    chat()
